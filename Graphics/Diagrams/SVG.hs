@@ -1,40 +1,43 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RecursiveDo, TypeFamilies, OverloadedStrings, RecordWildCards,UndecidableInstances, PackageImports, TemplateHaskell, RankNTypes #-}
 
-module Graphics.Diagrams.SVG where
+module Graphics.Diagrams.SVG (renderDiagram, printDiagram) where
 
 import Graphics.Diagrams.Core
-import Graphics.Diagrams.Path
 import Prelude hiding (sum,mapM_,mapM,concatMap)
 import Data.List (intercalate)
 import Numeric (showFFloat)
 import Data.Foldable
 import Data.Monoid
 import Lucid.Svg
+import Data.Text (pack, Text)
 
--- diaDebug msg = diaRaw $ "\n%DBG:" ++ msg ++ "\n"
-class Tikz a where
-  toTikz :: a -> Svg ()
+-- renderPoint pt = frozenPointElim pt $ \x y -> "(" <> showDistance x <> "," <> showDistance y <> ")"
 
-instance Tikz FrozenPoint where
-  toTikz pt = frozenPointElim pt $ \x y -> "(" <> showDistance x <> "," <> showDistance y <> ")"
+printDiagram :: Diagram Svg a -> IO ()
+printDiagram = print . renderDiagram
+
+renderDiagram :: Diagram Svg a -> Svg a
+renderDiagram d = do
+  doctype_
+  with (svg11_ (runDiagram svgBackend d)) []
 
 
-renderPath (StraightTo p) = lR (xpart p) (ypart p)
-renderPath (CurveTo c d p) = cR (xpart c) (ypart c) (xpart d) (ypart d) (xpart p) (ypart p)
-renderPath Cycle = z
+renderSegment :: forall a. RealFloat a => Segment a -> Text
+renderSegment (StraightTo p) = lA (xpart p) (ypart p)
+renderSegment (CurveTo c d p) = cA (xpart c) (ypart c) (xpart d) (ypart d) (xpart p) (ypart p)
+renderSegment Cycle = z
 
 showDistance :: Constant -> String
-showDistance x = showFFloat (Just 4) x tikzUnit
-    where tikzUnit = "pt"
+showDistance x = showFFloat (Just 4) x ""
 
--- instance Tikz LineTip where
---   toTikz t = case t of
+-- instance Svg LineTip where
+--   toSvg t = case t of
 --     ToTip -> "to"
 --     StealthTip -> "stealth"
 --     CircleTip -> "o"
 --     NoTip -> ""
 --     LatexTip -> "latex"
---     ReversedTip x -> toTikz x ++ " reversed"
+--     ReversedTip x -> toSvg x ++ " reversed"
 --     BracketTip -> "["
 --     ParensTip -> "("
 
@@ -43,8 +46,8 @@ showDashPat xs = intercalate "," [showDistance on <> "," <> " off " <> showDista
 
 renderPathOptions :: PathOptions -> [Attribute]
 renderPathOptions PathOptions{..} = 
-    [color_ _drawColor]
-    -- <> toTikz _startTip <> "-" <> toTikz _endTip <> ","
+    [stroke_ (pack c) | Just c <- [_drawColor] ]
+    -- <> toSvg _startTip <> "-" <> toSvg _endTip <> ","
     -- <> col "fill" _fillColor
     -- <> "line width=" <> showDistance _lineWidth <> ","
     -- <> "line cap=" <> (case _lineCap of
@@ -61,20 +64,21 @@ renderPathOptions PathOptions{..} =
     --        Decoration d -> ",decorate,decoration=" ++ d)
 
 
-tikzBackend :: Backend Svg 
-tikzBackend = Backend {..} where
-  _tracePath options (Path start segs) = do
-     path_ [d_ [mA (xpart start) (ypart start) <> renderPath segs ] ]
-  -- _traceLabel :: Monad x =>
-  --                  (location -> (FrozenPoint -> Tex ()) -> x ()) -> -- freezer
-  --                  (forall a. Tex a -> x a) -> -- embedder
-  --                  location ->
-  --                  Tex () -> -- label specification
-  --                  x BoxSpec
-  -- _traceLabel freezer embedder point lab = do
+svgBackend :: Backend Svg
+svgBackend = Backend {..} where
+  _tracePath options p = do
+     path_ ([d_ (mA (xpart start) (ypart start) <> mconcat (map renderSegment segs) ) | Path start segs <- [p] ] ++ renderPathOptions options)
+  _traceLabel :: Monad x =>
+                   (location -> (FrozenPoint -> Svg ()) -> x ()) -> -- freezer
+                   (forall a. Svg a -> x a) -> -- embedder
+                   location ->
+                   Svg () -> -- label specification
+                   x BoxSpec
+  _traceLabel freezer embedder point lab = do
+    return nilBoxSpec -- TODO
   --      bxId <- embedder $ Tex newLabel
   --      freezer point $ \p' -> do
-  --        tex $ "\\node[anchor=north west,inner sep=0] at " ++ toTikz p'
+  --        tex $ "\\node[anchor=north west,inner sep=0] at " ++ toSvg p'
   --        fillBox bxId True $ braces $ lab
   --        tex ";\n"
   --      embedder $ getBoxFromId bxId
