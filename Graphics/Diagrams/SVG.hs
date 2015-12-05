@@ -6,21 +6,22 @@ import Graphics.Diagrams.Core
 import Prelude hiding (sum,mapM_,mapM,concatMap)
 import Data.List (intercalate)
 import Numeric (showFFloat)
-import Data.Foldable
 import Data.Monoid
 import Lucid.Svg
 import Data.Text (pack, Text)
 
--- renderPoint pt = frozenPointElim pt $ \x y -> "(" <> showDistance x <> "," <> showDistance y <> ")"
+-- import Control.Monad.RWS
+-- newtype SvgM a = SvgM {fromSvgM :: RWST () () (FrozenPoint) Svg a}
 
-printDiagram :: Diagram Svg a -> IO ()
+type DiagramSvg = Diagram Svg
+
+printDiagram :: DiagramSvg a -> IO ()
 printDiagram = print . renderDiagram
 
-renderDiagram :: Diagram Svg a -> Svg a
+renderDiagram :: DiagramSvg a -> Svg a
 renderDiagram d = do
   doctype_
-  with (svg11_ (runDiagram svgBackend d)) []
-
+  svg11_ $ (g_ (runDiagram svgBackend d) `with` [transform_ $ pack "translate(-100,-100)"])
 
 renderSegment :: forall a. RealFloat a => Segment a -> Text
 renderSegment (StraightTo p) = lA (xpart p) (ypart p)
@@ -42,13 +43,14 @@ showDistance x = showFFloat (Just 4) x ""
 --     ParensTip -> "("
 
 showDashPat :: DashPattern -> String
-showDashPat xs = intercalate "," [showDistance on <> "," <> " off " <> showDistance off | (on,off) <- xs]
+showDashPat xs = intercalate "," [showDistance on <> "," <> showDistance off | (on,off) <- xs]
 
 renderPathOptions :: PathOptions -> [Attribute]
 renderPathOptions PathOptions{..} = 
-    [stroke_ (pack c) | Just c <- [_drawColor] ]
+    [stroke_ (col _drawColor),
+     fill_ (col _fillColor)
+    ]
     -- <> toSvg _startTip <> "-" <> toSvg _endTip <> ","
-    -- <> col "fill" _fillColor
     -- <> "line width=" <> showDistance _lineWidth <> ","
     -- <> "line cap=" <> (case _lineCap of
     --                       RoundCap -> "round"
@@ -62,7 +64,10 @@ renderPathOptions PathOptions{..} =
     -- <> (case _decoration of
     --        Decoration [] -> ""
     --        Decoration d -> ",decorate,decoration=" ++ d)
-
+  where
+    col c = pack $ case c of
+      Nothing -> "none"
+      Just c' -> c'
 
 svgBackend :: Backend Svg
 svgBackend = Backend {..} where

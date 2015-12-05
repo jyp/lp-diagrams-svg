@@ -19,6 +19,11 @@ library
                , text
                , containers
                , lens
+               , svg-tree
+               , mtl
+               , linear
+               , JuicyPixels
   exposed-modules: Graphics.Diagrams.SVG
+  exposed-modules: Graphics.Diagrams.SVG2
 
   default-language:    Haskell2010
