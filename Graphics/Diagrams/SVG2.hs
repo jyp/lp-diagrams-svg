@@ -9,27 +9,38 @@ import Numeric (showFFloat)
 import Data.Monoid
 import Graphics.Svg as S
 import Control.Monad.RWS
+import Control.Monad (when)
 import Linear.V2 (V2(..))
 import Codec.Picture.Types (PixelRGBA8(..))
-type SvgM = RWS () [Path] FrozenPoint
+import Graphics.Text.TrueType
+import qualified Data.Vector.Unboxed as V
+
+type SvgM = RWS Font [Path] FrozenPoint
 -- newtype SvgM a = SvgM {fromSvgM :: RWS () [Tree] FrozenPoint a} 
-  
-type DiagramSvg = Diagram SvgM
 
-saveDiagram fn = saveXmlFile fn . renderDiagram
+type DiagramSvg = Diagram String SvgM
 
-renderDiagram :: DiagramSvg a -> Document
-renderDiagram d = Document {_viewBox = Nothing
-                           ,_width = Nothing
-                           ,_height = Nothing
-                           ,_definitions = mempty
-                           ,_description = "no description"
-                           ,_documentLocation = "no location"
-                           ,_styleRules = []
-                           ,_elements = map PathTree paths}
-  where (_,minPoint,paths) = runRWS (runDiagram svgBackend d) () (D.Point 1000.0 1000.0)
+saveDiagram fn fontFam d = do
+  Just fontFn <- findFontOfFamily fontFam (FontStyle False False)
+  Right font <- loadFontFile fontFn
+  saveXmlFile fn $ renderDiagram font d
 
-renderPoint (D.Point x y) = V2 x y
+-- renderDiagram :: DiagramSvg a -> Document
+renderDiagram font d = Document
+   {_viewBox = Nothing
+   ,_width = Nothing
+   ,_height = Nothing
+   ,_definitions = mempty
+   ,_description = "no description"
+   ,_documentLocation = "no location"
+   ,_styleRules = []
+   ,_elements = map PathTree paths}
+  where (_,minPoint,paths) = runRWS (runDiagram svgBackend d) font (D.Point 1000.0 1000.0)
+
+ptToPx z = 4*z / 3
+
+renderPoint (D.Point x y) = V2 (ptToPx x) (ptToPx y)
+
 renderSegment (StraightTo p) = LineTo OriginAbsolute [renderPoint p]
 renderSegment (D.CurveTo c d p) = S.CurveTo OriginAbsolute [(renderPoint c,renderPoint d,renderPoint p)]
 renderSegment Cycle = EndPath
@@ -70,12 +81,15 @@ renderPathOptions PathOptions{..} = mempty
     -- <> (case _decoration of
     --        Decoration [] -> ""
     --        Decoration d -> ",decorate,decoration=" ++ d)
- where col c = case c of
+col c = case c of
                  Nothing -> Just $ FillNone
                  Just "black" -> Just $ ColorRef $ PixelRGBA8 0 0 0 0
                  Just c' -> Just $ TextureRef c'
 
-svgBackend :: Backend SvgM
+renderPair :: (Float,Float) -> V2 Double
+renderPair (x,y) = V2 (realToFrac x) (realToFrac y)
+
+svgBackend :: Backend String SvgM
 svgBackend = Backend {..} where
   _tracePath _ EmptyPath = return ()
   _tracePath options (D.Path start segs) = do
@@ -84,9 +98,15 @@ svgBackend = Backend {..} where
                    (location -> (FrozenPoint -> SvgM ()) -> x ()) -> -- freezer
                    (forall a. SvgM a -> x a) -> -- embedder
                    location ->
-                   SvgM () -> -- label specification
+                   String -> -- label specification
                    x BoxSpec
   _traceLabel freezer embedder point lab = do
+    freezer point $ \p -> do
+      font <- ask
+      let contours = getStringCurveAtPoint 100 (realToFrac $ xpart p, realToFrac $ ypart p) [(font,PointSize 10,lab)]
+      forM_ (concat contours) $ \contour -> when (not (V.null contour)) $ do
+        tell [S.Path textAttrs [MoveTo OriginAbsolute [renderPair (V.head contour)]
+                               ,LineTo OriginAbsolute (fmap renderPair (V.toList (V.tail contour)))]]
     return nilBoxSpec -- TODO
   --      bxId <- embedder $ Tex newLabel
   --      freezer point $ \p' -> do
@@ -96,3 +116,4 @@ svgBackend = Backend {..} where
   --      embedder $ getBoxFromId bxId
 
 
+textAttrs = mempty {S._fillColor = Last $ col $ Just "black"}
