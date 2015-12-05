@@ -1,0 +1,24 @@
+name:           lp-diagrams-svg
+version:        1.0
+category:       Graphics
+synopsis:       SVG Backend for lp-diagrams
+license:        AGPL-3
+license-file:   LICENSE
+author:         Jean-Philippe Bernardy
+maintainer:     jeanphilippe.bernardy@gmail.com
+Cabal-Version:  >= 1.18
+build-type:     Simple
+
+library
+  default
+  build-depends: base>=4.2&&<5
+  build-depends: directory>=1.2
+  build-depends: lp-diagrams
+  build-depends: base
+               , lucid-svg
+               , text
+               , containers
+               , lens
+  exposed-modules: Graphics.Diagrams.SVG
+
+  default-language:    Haskell2010
