@@ -10,9 +10,7 @@ Cabal-Version:  >= 1.18
 build-type:     Simple
 
 library
-  default
-  build-depends: base>=4.2&&<5
-  build-depends: directory>=1.2
+  -- build-depends: directory>=1.2
   build-depends: lp-diagrams
   build-depends: base
                , lucid-svg
@@ -29,3 +27,16 @@ library
   exposed-modules: Graphics.Diagrams.SVG2
 
   default-language:    Haskell2010
+
+executable lp-diagrams-svg-example
+  hs-source-dirs: examples
+  main-is: Main.hs
+  build-depends: lp-diagrams-svg
+  build-depends: lp-diagrams
+  build-depends: base
+               , containers
+               , lens
+               -- , svg-tree
+               -- , mtl
+               -- , linear
+               -- , FontyFruity

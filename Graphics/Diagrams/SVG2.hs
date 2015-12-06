@@ -21,9 +21,13 @@ type SvgM = RWS Font [Path] FrozenPoint
 type DiagramSvg = Diagram String SvgM
 
 saveDiagram fn fontFam d = do
+  putStrLn $ "Finding font: " ++ fontFam
   Just fontFn <- findFontOfFamily fontFam (FontStyle False False)
-  Right font <- loadFontFile fontFn
-  saveXmlFile fn $ renderDiagram font d
+  putStrLn $ "Loading font: " ++ fontFn
+  mfont <- loadFontFile fontFn
+  case mfont of
+   Right font -> saveXmlFile fn $ renderDiagram font d
+   Left err -> error err
 
 -- renderDiagram :: DiagramSvg a -> Document
 renderDiagram font d = Document
@@ -89,11 +93,16 @@ col c = case c of
 renderPair :: (Float,Float) -> V2 Double
 renderPair (x,y) = V2 (realToFrac x) (realToFrac y)
 
+lbound (D.Point x1 y1) (D.Point x2 y2) = D.Point (min x1 x2) (min y1 y2)
+
+mkPairs (x:y:xs) = (x,y):mkPairs xs
+mkPairs _ = []
 svgBackend :: Backend String SvgM
 svgBackend = Backend {..} where
   _tracePath _ EmptyPath = return ()
   _tracePath options (D.Path start segs) = do
     tell [S.Path (renderPathOptions options) (MoveTo OriginAbsolute [renderPoint start]:map renderSegment segs)]
+    
   _traceLabel :: Monad x =>
                    (location -> (FrozenPoint -> SvgM ()) -> x ()) -> -- freezer
                    (forall a. SvgM a -> x a) -> -- embedder
@@ -104,9 +113,10 @@ svgBackend = Backend {..} where
     freezer point $ \p -> do
       font <- ask
       let contours = getStringCurveAtPoint 100 (realToFrac $ xpart p, realToFrac $ ypart p) [(font,PointSize 10,lab)]
-      forM_ (concat contours) $ \contour -> when (not (V.null contour)) $ do
-        tell [S.Path textAttrs [MoveTo OriginAbsolute [renderPair (V.head contour)]
-                               ,LineTo OriginAbsolute (fmap renderPair (V.toList (V.tail contour)))]]
+      forM_ contours $ \contour ->
+        tell [S.Path textAttrs $ concat
+              [[MoveTo OriginAbsolute [renderPair (V.head c)]
+               ,QuadraticBezier OriginAbsolute (mkPairs $ fmap renderPair (V.toList (V.tail c)))]] | c <- contour, not (V.null c)]
     return nilBoxSpec -- TODO
   --      bxId <- embedder $ Tex newLabel
   --      freezer point $ \p' -> do
