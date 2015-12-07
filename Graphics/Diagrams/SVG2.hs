@@ -15,7 +15,7 @@ import Codec.Picture.Types (PixelRGBA8(..))
 import Graphics.Text.TrueType
 import qualified Data.Vector.Unboxed as V
 
-type SvgM = RWS Font [Path] FrozenPoint
+type SvgM = RWS Font [Path] (FrozenPoint,FrozenPoint)
 -- newtype SvgM a = SvgM {fromSvgM :: RWS () [Tree] FrozenPoint a} 
 
 type DiagramSvg = Diagram String SvgM
@@ -32,7 +32,7 @@ saveDiagram fn fontFam d = do
 
 -- renderDiagram :: DiagramSvg a -> Document
 renderDiagram font d = Document
-   {_viewBox = Nothing
+   {_viewBox = Just (xpart lo',ypart lo',xpart sz,ypart sz)
    ,_width = Nothing
    ,_height = Nothing
    ,_definitions = mempty
@@ -40,8 +40,10 @@ renderDiagram font d = Document
    ,_documentLocation = "no location"
    ,_styleRules = []
    ,_elements = map PathTree paths}
-  where (_,minPoint,paths) = runRWS (runDiagram svgBackend d) font maxPt
-
+  where (_,(lo,hi),paths) = runRWS (runDiagram svgBackend d) font infimum
+        lo' = fmap floor lo
+        hi' = fmap ceiling hi
+        sz = hi' - lo'
 ptToPx z = 4*z / 3
 
 renderPoint (D.Point x y) = V2 (ptToPx x) (ptToPx y)
@@ -107,12 +109,16 @@ renderPair (x,y) = V2 (realToFrac x) (realToFrac y)
 
 lbound (D.Point x1 y1) (D.Point x2 y2) = D.Point (min x1 x2) (min y1 y2)
 maxPt = D.Point 1000.0 1000.0
+infimum = (maxPt, negate maxPt)
+union (l1,h1) (l2,h2) = (lbound l1 l2, negate (lbound (negate h1) (negate h2)))
+dup x = (x,x)
 
 pathPoints EmptyPath = []
 pathPoints (D.Path start segs) = start:concat (map segPoints segs)
 
 segPoints (D.StraightTo x) = [x]
 segPoints (D.CurveTo c d p) = [c,d,p]
+segPoints Cycle = []
 
 mkPairs (x:y:xs) = (x,y):mkPairs xs
 mkPairs _ = []
@@ -121,8 +127,8 @@ svgBackend = Backend {..} where
   _tracePath _ EmptyPath = return ()
   _tracePath options pth@(D.Path start segs) = do
     tell [S.Path (renderPathOptions options) (MoveTo OriginAbsolute [renderPoint start]:map renderSegment segs)]
-    let l = foldr lbound maxPt $ pathPoints pth
-    modify (lbound l)
+    let bx = foldr union infimum $ map dup (pathPoints pth)
+    modify (union bx)
   _traceLabel :: Monad x =>
                    (location -> (FrozenPoint -> SvgM ()) -> x ()) -> -- freezer
                    (forall a. SvgM a -> x a) -> -- embedder
@@ -146,12 +152,6 @@ svgBackend = Backend {..} where
            | contour <- contours]
     return (BoxSpec {..})
     return nilBoxSpec -- FIXME
-  --      bxId <- embedder $ Tex newLabel
-  --      freezer point $ \p' -> do
-  --        tex $ "\\node[anchor=north west,inner sep=0] at " ++ toSvg p'
-  --        fillBox bxId True $ braces $ lab
-  --        tex ";\n"
-  --      embedder $ getBoxFromId bxId
 
 
 textAttrs = mempty {S._fillColor = Last $ col $ Just "black"}
