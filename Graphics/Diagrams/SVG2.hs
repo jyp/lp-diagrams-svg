@@ -20,6 +20,7 @@ type SvgM = RWS Font [Path] FrozenPoint
 
 type DiagramSvg = Diagram String SvgM
 
+saveDiagram :: FilePath -> String -> DiagramSvg () -> IO ()
 saveDiagram fn fontFam d = do
   putStrLn $ "Finding font: " ++ fontFam
   Just fontFn <- findFontOfFamily fontFam (FontStyle False False)
@@ -39,7 +40,7 @@ renderDiagram font d = Document
    ,_documentLocation = "no location"
    ,_styleRules = []
    ,_elements = map PathTree paths}
-  where (_,minPoint,paths) = runRWS (runDiagram svgBackend d) font (D.Point 1000.0 1000.0)
+  where (_,minPoint,paths) = runRWS (runDiagram svgBackend d) font maxPt
 
 ptToPx z = 4*z / 3
 
@@ -94,15 +95,23 @@ renderPair :: (Float,Float) -> V2 Double
 renderPair (x,y) = V2 (realToFrac x) (realToFrac y)
 
 lbound (D.Point x1 y1) (D.Point x2 y2) = D.Point (min x1 x2) (min y1 y2)
+maxPt = D.Point 1000.0 1000.0
+
+pathPoints EmptyPath = []
+pathPoints (D.Path start segs) = start:concat (map segPoints segs)
+
+segPoints (D.StraightTo x) = [x]
+segPoints (D.CurveTo c d p) = [c,d,p]
 
 mkPairs (x:y:xs) = (x,y):mkPairs xs
 mkPairs _ = []
 svgBackend :: Backend String SvgM
 svgBackend = Backend {..} where
   _tracePath _ EmptyPath = return ()
-  _tracePath options (D.Path start segs) = do
+  _tracePath options pth@(D.Path start segs) = do
     tell [S.Path (renderPathOptions options) (MoveTo OriginAbsolute [renderPoint start]:map renderSegment segs)]
-    
+    let l = foldr lbound maxPt $ pathPoints pth
+    modify (lbound l)
   _traceLabel :: Monad x =>
                    (location -> (FrozenPoint -> SvgM ()) -> x ()) -> -- freezer
                    (forall a. SvgM a -> x a) -> -- embedder
@@ -113,10 +122,11 @@ svgBackend = Backend {..} where
     freezer point $ \p -> do
       font <- ask
       let contours = getStringCurveAtPoint 100 (realToFrac $ xpart p, realToFrac $ ypart p) [(font,PointSize 10,lab)]
-      forM_ contours $ \contour ->
-        tell [S.Path textAttrs $ concat
-              [[MoveTo OriginAbsolute [renderPair (V.head c)]
-               ,QuadraticBezier OriginAbsolute (mkPairs $ fmap renderPair (V.toList (V.tail c)))]] | c <- contour, not (V.null c)]
+      tell [S.Path textAttrs $
+              concat [[MoveTo OriginAbsolute [renderPair (V.head c)]
+                      ,QuadraticBezier OriginAbsolute (mkPairs $ fmap renderPair (V.toList (V.tail c)))]
+                     | c <- contour, not (V.null c)]
+           | contour <- contours]
     return nilBoxSpec -- TODO
   --      bxId <- embedder $ Tex newLabel
   --      freezer point $ \p' -> do
