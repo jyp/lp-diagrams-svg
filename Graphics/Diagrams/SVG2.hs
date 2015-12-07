@@ -64,8 +64,8 @@ showDistance x = showFFloat (Just 4) x ""
 --     BracketTip -> "["
 --     ParensTip -> "("
 
-showDashPat :: DashPattern -> String
-showDashPat xs = intercalate "," [showDistance on <> "," <> showDistance off | (on,off) <- xs]
+renderDashPattern [] = Nothing
+renderDashPattern xs = Just $ concat [[S.Point on, S.Point off] | (on,off) <- xs]
 
 renderPathOptions :: PathOptions -> DrawAttributes
 renderPathOptions PathOptions{..} = mempty
@@ -76,16 +76,27 @@ renderPathOptions PathOptions{..} = mempty
                           RoundCap -> CapRound
                           RectCap -> CapSquare
                           ButtCap -> CapButt
+                          
+    -- _strokeOpacity,
+   ,_strokeLineJoin = case _lineJoin of
+                       RoundJoin -> Last $ Just $ JoinRound
+                       BevelJoin -> Last $ Just $ JoinBevel
+                       MiterJoin -> Last $ Just $ JoinMiter
+    -- _strokeMiterLimit,
+    -- _fillOpacity,
+    -- _groupOpacity,
+    -- _transform, _fillRule,
+    -- _maskRef, _clipPathRef,
+    -- _clipRule, _attrClass,
+    -- _attrId, _strokeOffset,
+   ,_strokeDashArray = Last $ renderDashPattern _dashPattern
+    -- _fontSize, _fontFamily,
+    -- _fontStyle,
+    -- _textAnchor,
+    -- _markerStart,
+    -- _markerMid, _markerEnd
     }
     -- <> toSvg _startTip <> "-" <> toSvg _endTip <> ","
-    -- <> "line join=" <> (case _lineJoin of
-    --                       RoundJoin -> "round"
-    --                       BevelJoin -> "bevel"
-    --                       MiterJoin -> "miter") <> ","
-    -- <> "dash pattern=" <> showDashPat _dashPattern
-    -- <> (case _decoration of
-    --        Decoration [] -> ""
-    --        Decoration d -> ",decorate,decoration=" ++ d)
 col c = case c of
                  Nothing -> Just $ FillNone
                  Just "black" -> Just $ ColorRef $ PixelRGBA8 0 0 0 0
@@ -119,15 +130,22 @@ svgBackend = Backend {..} where
                    String -> -- label specification
                    x BoxSpec
   _traceLabel freezer embedder point lab = do
+    font <- embedder ask
+    let dpi = 144 -- 72 * 4/3
+        pointSize = PointSize 10
+        bbox = stringBoundingBox font dpi pointSize lab
+        boxHeight = realToFrac (_baselineHeight bbox - _yMin bbox)
+        boxWidth = realToFrac (_xMax bbox - _xMin bbox)
+        boxDepth = realToFrac (_yMax bbox - _baselineHeight bbox)
     freezer point $ \p -> do
-      font <- ask
-      let contours = getStringCurveAtPoint 100 (realToFrac $ xpart p, realToFrac $ ypart p) [(font,PointSize 10,lab)]
+      let contours = getStringCurveAtPoint dpi (realToFrac $ xpart p, realToFrac $ ypart p) [(font,pointSize,lab)]
       tell [S.Path textAttrs $
               concat [[MoveTo OriginAbsolute [renderPair (V.head c)]
                       ,QuadraticBezier OriginAbsolute (mkPairs $ fmap renderPair (V.toList (V.tail c)))]
                      | c <- contour, not (V.null c)]
            | contour <- contours]
-    return nilBoxSpec -- TODO
+    return (BoxSpec {..})
+    return nilBoxSpec -- FIXME
   --      bxId <- embedder $ Tex newLabel
   --      freezer point $ \p' -> do
   --        tex $ "\\node[anchor=north west,inner sep=0] at " ++ toSvg p'
