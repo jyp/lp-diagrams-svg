@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RecursiveDo, TypeFamilies, OverloadedStrings, RecordWildCards,UndecidableInstances, PackageImports, TemplateHaskell, RankNTypes #-}
 
-module Graphics.Diagrams.SVG2 (renderDiagram, saveDiagram) where
+module Graphics.Diagrams.SVG2 (renderDiagram, saveDiagram, DiagramSvg) where
 
 import Graphics.Diagrams.Core as D
 import Prelude hiding (sum,mapM_,mapM,concatMap)
@@ -15,7 +15,7 @@ import Codec.Picture.Types (PixelRGBA8(..))
 import Graphics.Text.TrueType
 import qualified Data.Vector.Unboxed as V
 
-type SvgM = RWS Font [Path] (FrozenPoint,FrozenPoint)
+type SvgM = RWS Font [Path] (V2 Double,V2 Double)
 -- newtype SvgM a = SvgM {fromSvgM :: RWS () [Tree] FrozenPoint a} 
 
 type DiagramSvg = Diagram String SvgM
@@ -32,7 +32,7 @@ saveDiagram fn fontFam d = do
 
 -- renderDiagram :: DiagramSvg a -> Document
 renderDiagram font d = Document
-   {_viewBox = Just (xpart lo',ypart lo',xpart sz,ypart sz)
+   {_viewBox = Just (lo'x,lo'y,hi'x-lo'x,hi'y-lo'y)
    ,_width = Nothing
    ,_height = Nothing
    ,_definitions = mempty
@@ -41,12 +41,12 @@ renderDiagram font d = Document
    ,_styleRules = []
    ,_elements = map PathTree paths}
   where (_,(lo,hi),paths) = runRWS (runDiagram svgBackend d) font infimum
-        lo' = fmap floor lo
-        hi' = fmap ceiling hi
-        sz = hi' - lo'
+        V2 lo'x lo'y = fmap floor $ lo
+        V2 hi'x hi'y = fmap ceiling $ hi
+
 ptToPx z = 4*z / 3
 
-renderPoint (D.Point x y) = V2 (ptToPx x) (ptToPx y)
+renderPoint (D.Point x y) = V2 (ptToPx x) (negate $ ptToPx y)
 
 renderSegment (StraightTo p) = LineTo OriginAbsolute [renderPoint p]
 renderSegment (D.CurveTo c d p) = S.CurveTo OriginAbsolute [(renderPoint c,renderPoint d,renderPoint p)]
@@ -102,13 +102,12 @@ renderPathOptions PathOptions{..} = mempty
 col c = case c of
                  Nothing -> Just $ FillNone
                  Just "black" -> Just $ ColorRef $ PixelRGBA8 0 0 0 0
+                 Just "red" -> Just $ ColorRef $ PixelRGBA8 255 0 0 100
+                 Just "blue" -> Just $ ColorRef $ PixelRGBA8 0 0 255 100
                  Just c' -> Just $ TextureRef c'
 
-renderPair :: (Float,Float) -> V2 Double
-renderPair (x,y) = V2 (realToFrac x) (realToFrac y)
-
-lbound (D.Point x1 y1) (D.Point x2 y2) = D.Point (min x1 x2) (min y1 y2)
-maxPt = D.Point 1000.0 1000.0
+lbound (V2 x1 y1) (V2 x2 y2) = V2 (min x1 x2) (min y1 y2)
+maxPt = V2 1000.0 1000.0
 infimum = (maxPt, negate maxPt)
 union (l1,h1) (l2,h2) = (lbound l1 l2, negate (lbound (negate h1) (negate h2)))
 dup x = (x,x)
@@ -122,12 +121,13 @@ segPoints Cycle = []
 
 mkPairs (x:y:xs) = (x,y):mkPairs xs
 mkPairs _ = []
+
 svgBackend :: Backend String SvgM
 svgBackend = Backend {..} where
   _tracePath _ EmptyPath = return ()
   _tracePath options pth@(D.Path start segs) = do
     tell [S.Path (renderPathOptions options) (MoveTo OriginAbsolute [renderPoint start]:map renderSegment segs)]
-    let bx = foldr union infimum $ map dup (pathPoints pth)
+    let bx = foldr union infimum $ map dup $ map renderPoint $ pathPoints pth
     modify (union bx)
   _traceLabel :: Monad x =>
                    (location -> (FrozenPoint -> SvgM ()) -> x ()) -> -- freezer
@@ -137,21 +137,23 @@ svgBackend = Backend {..} where
                    x BoxSpec
   _traceLabel freezer embedder point lab = do
     font <- embedder ask
-    let dpi = 144 -- 72 * 4/3
+    let dpi = 72
+        -- 144 -- 72 * 4/3
         pointSize = PointSize 10
         bbox = stringBoundingBox font dpi pointSize lab
-        boxHeight = realToFrac (_baselineHeight bbox - _yMin bbox)
         boxWidth = realToFrac (_xMax bbox - _xMin bbox)
-        boxDepth = realToFrac (_yMax bbox - _baselineHeight bbox)
+        boxHeight = realToFrac (_yMax bbox - _baselineHeight bbox)
+        boxDepth = realToFrac (_baselineHeight bbox - _yMin bbox)
     freezer point $ \p -> do
-      let contours = getStringCurveAtPoint dpi (realToFrac $ xpart p, realToFrac $ ypart p) [(font,pointSize,lab)]
+      let contours = getStringCurveAtPoint dpi (0,0) [(font,pointSize,lab)]
+          renderPair :: (Float,Float) -> V2 Double
+          renderPair (x,y) = renderPoint $ (D.Point (realToFrac x) (negate (realToFrac y) - boxHeight)) + p
       tell [S.Path textAttrs $
               concat [[MoveTo OriginAbsolute [renderPair (V.head c)]
                       ,QuadraticBezier OriginAbsolute (mkPairs $ fmap renderPair (V.toList (V.tail c)))]
                      | c <- contour, not (V.null c)]
            | contour <- contours]
     return (BoxSpec {..})
-    return nilBoxSpec -- FIXME
 
 
 textAttrs = mempty {S._fillColor = Last $ col $ Just "black"}
