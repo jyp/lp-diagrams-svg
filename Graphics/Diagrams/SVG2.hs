@@ -14,11 +14,33 @@ import Linear.V2 (V2(..))
 import Codec.Picture.Types (PixelRGBA8(..))
 import Graphics.Text.TrueType
 import qualified Data.Vector.Unboxed as V
+import qualified Data.Map as M
 
+-- TODO -- add a newtype so this does not leak to the user code.
 type SvgM = RWS Font [Path] (V2 Double,V2 Double)
--- newtype SvgM a = SvgM {fromSvgM :: RWS () [Tree] FrozenPoint a} 
 
 type DiagramSvg = Diagram String SvgM
+
+arrowHead = Marker {
+  _markerDrawAttributes = mempty,
+  _markerRefPoint = (Px 0,Px 0),
+  _markerWidth = Nothing,
+  _markerHeight = Nothing,
+  _markerOrient = Just OrientationAuto,
+  _markerUnits = Nothing,
+  _markerViewBox = Nothing,
+  _markerElements =
+    [PathTree $ S.Path
+     mempty {_transform = Just [Scale 0.8 Nothing, Rotate 180 Nothing, Translate 12.5 0]
+            ,_fillRule = Last $ Just $ FillEvenOdd
+            ,_strokeColor = Last $ Just $ ColorRef $ PixelRGBA8 0 0 0 0
+            ,_strokeWidth = Last $ Just $ (S.Point 1)
+            ,_strokeOpacity = Just 1
+            ,S._fillColor = Last $ Just $ ColorRef $ PixelRGBA8 0 0 0 0
+            ,_fillOpacity = Just 1
+            }
+     [ MoveTo OriginAbsolute [V2 0 0], lA 5.0 (-5.0), lA (-12.5) 0.0, lA 5.0 5.0, lA 0.0 0.0, EndPath]]}
+  where lA x y = LineTo OriginAbsolute [V2 x y]
 
 saveDiagram :: FilePath -> String -> DiagramSvg () -> IO ()
 saveDiagram fn fontFam d = do
@@ -35,7 +57,7 @@ renderDiagram font d = Document
    {_viewBox = Just (lo'x,lo'y,hi'x-lo'x,hi'y-lo'y)
    ,_width = Nothing
    ,_height = Nothing
-   ,_definitions = mempty
+   ,_definitions = M.fromList [("stealth",ElementMarker arrowHead)]
    ,_description = "no description"
    ,_documentLocation = "no location"
    ,_styleRules = []
@@ -55,16 +77,9 @@ renderSegment Cycle = EndPath
 showDistance :: Constant -> String
 showDistance x = showFFloat (Just 4) x ""
 
--- instance Svg LineTip where
---   toSvg t = case t of
---     ToTip -> "to"
---     StealthTip -> "stealth"
---     CircleTip -> "o"
---     NoTip -> ""
---     LatexTip -> "latex"
---     ReversedTip x -> toSvg x ++ " reversed"
---     BracketTip -> "["
---     ParensTip -> "("
+renderTip t = case t of
+  NoTip -> Nothing
+  _ -> Just $ Ref "stealth"
 
 renderDashPattern [] = Nothing
 renderDashPattern xs = Just $ concat [[S.Point on, S.Point off] | (on,off) <- xs]
@@ -78,7 +93,6 @@ renderPathOptions PathOptions{..} = mempty
                           RoundCap -> CapRound
                           RectCap -> CapSquare
                           ButtCap -> CapButt
-                          
     -- _strokeOpacity,
    ,_strokeLineJoin = case _lineJoin of
                        RoundJoin -> Last $ Just $ JoinRound
@@ -95,8 +109,9 @@ renderPathOptions PathOptions{..} = mempty
     -- _fontSize, _fontFamily,
     -- _fontStyle,
     -- _textAnchor,
-    -- _markerStart,
-    -- _markerMid, _markerEnd
+    ,_markerStart = Last $ renderTip _startTip
+    -- _markerMid,
+    ,_markerEnd = Last $ renderTip _endTip
     }
     -- <> toSvg _startTip <> "-" <> toSvg _endTip <> ","
 col c = case c of
