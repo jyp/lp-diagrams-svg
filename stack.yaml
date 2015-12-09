@@ -6,6 +6,7 @@ resolver: lts-3.16
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
+- '../svg-tree'
 - '../lp-diagrams'
 - '../typography-geometry'
 

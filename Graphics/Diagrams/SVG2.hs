@@ -29,6 +29,7 @@ arrowHead = Marker {
   _markerOrient = Just OrientationAuto,
   _markerUnits = Nothing,
   _markerViewBox = Nothing,
+  _markerOverflow = Just OverflowVisible,
   _markerElements =
     [PathTree $ S.Path
      mempty {_transform = Just [Scale 0.8 Nothing, Rotate 180 Nothing, Translate 12.5 0]
@@ -58,13 +59,13 @@ renderDiagram font d = Document
    ,_width = Nothing
    ,_height = Nothing
    ,_definitions = M.fromList [("stealth",ElementMarker arrowHead)]
-   ,_description = "no description"
+   ,_description = "lp-diagrams-svg generated document"
    ,_documentLocation = "no location"
    ,_styleRules = []
    ,_elements = map PathTree paths}
   where (_,(lo,hi),paths) = runRWS (runDiagram svgBackend d) font infimum
-        V2 lo'x lo'y = fmap floor $ lo
-        V2 hi'x hi'y = fmap ceiling $ hi
+        V2 lo'x lo'y = lo -- fmap floor $ lo
+        V2 hi'x hi'y = hi -- fmap ceiling $ hi
 
 ptToPx z = 4*z / 3
 
