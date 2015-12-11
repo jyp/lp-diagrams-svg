@@ -10,7 +10,6 @@ Cabal-Version:  >= 1.18
 build-type:     Simple
 
 library
-  -- build-depends: directory>=1.2
   build-depends: lp-diagrams
   build-depends: base
                , lucid-svg
@@ -23,8 +22,9 @@ library
                , JuicyPixels
                , FontyFruity
                , vector
-  -- exposed-modules: Graphics.Diagrams.SVG
-  exposed-modules: Graphics.Diagrams.SVG2
+               , optparse-applicative
+  exposed-modules: Graphics.Diagrams.Backend.SVGTree
+  exposed-modules: Graphics.Diagrams.SVG
 
   default-language:    Haskell2010
 
@@ -37,6 +37,7 @@ executable lp-diagrams-svg-example
   build-depends: base
                , containers
                , lens
+               , FontyFruity
                -- , svg-tree
                -- , mtl
                -- , linear

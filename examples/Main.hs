@@ -1,7 +1,5 @@
 
-import Graphics.Diagrams.SVG2
-import Graphics.Diagrams
-import System.Environment
+import Graphics.Diagrams.SVG
 
 autoLab s i = do
   o <- labelObj s
@@ -9,7 +7,7 @@ autoLab s i = do
   -- stroke "blue" $ path $ polygon [o # NW, o # NE, o # SE, o # SW]
   autoLabel o i
 
-testDiagram :: DiagramSvg ()
+testDiagram :: SvgDiagram ()
 testDiagram = do
   -- draw $ path $ circle (Point 0 0) 5
   a   <- labelObj $ "ha"
@@ -40,11 +38,7 @@ testDiagram = do
   return ()
 
 main :: IO ()
-main = do
-  [font] <- getArgs
-  saveDiagram "test.svg" font testDiagram
--- fonts which fail with ~/.fonts: openBinaryFile: does not exist
--- DejaVu, DroidSans
+main = renderMain testDiagram
 -- fonts which fail with 'not enough bytes'
 -- Cantarell, FreeSans, Asana Math
--- fonts which do work: Amiri, Roboto
+-- fonts which do work: Amiri, Roboto, DejaVu Sans, Droid Sans

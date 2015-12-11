@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RecursiveDo, TypeFamilies, OverloadedStrings, RecordWildCards,UndecidableInstances, PackageImports, TemplateHaskell, RankNTypes #-}
 
-module Graphics.Diagrams.SVG2 (renderDiagram, saveDiagram, DiagramSvg) where
+module Graphics.Diagrams.Backend.SVGTree (renderDiagram, saveDiagram, SvgDiagram) where
 
 import Graphics.Diagrams.Core as D
 import Prelude hiding (sum,mapM_,mapM,concatMap)
@@ -19,7 +19,7 @@ import qualified Data.Map as M
 -- TODO -- add a newtype so this does not leak to the user code.
 type SvgM = RWS Font [Path] (V2 Double,V2 Double)
 
-type DiagramSvg = Diagram String SvgM
+type SvgDiagram = Diagram String SvgM
 
 arrowHead = Marker {
   _markerDrawAttributes = mempty,
@@ -43,7 +43,7 @@ arrowHead = Marker {
      [ MoveTo OriginAbsolute [V2 0 0], lA 5.0 (-5.0), lA (-12.5) 0.0, lA 5.0 5.0, lA 0.0 0.0, EndPath]]}
   where lA x y = LineTo OriginAbsolute [V2 x y]
 
-saveDiagram :: FilePath -> String -> DiagramSvg () -> IO ()
+saveDiagram :: FilePath -> String -> SvgDiagram () -> IO ()
 saveDiagram fn fontFam d = do
   putStrLn $ "Finding font: " ++ fontFam
   Just fontFn <- findFontOfFamily fontFam (FontStyle False False)
@@ -53,7 +53,7 @@ saveDiagram fn fontFam d = do
    Right font -> saveXmlFile fn $ renderDiagram font d
    Left err -> error err
 
--- renderDiagram :: DiagramSvg a -> Document
+-- renderDiagram :: SvgDiagram a -> Document
 renderDiagram font d = Document
    {_viewBox = Just (lo'x,lo'y,hi'x-lo'x,hi'y-lo'y)
    ,_width = Nothing
