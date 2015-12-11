@@ -56,8 +56,8 @@ saveDiagram fn fontFam d = do
 -- renderDiagram :: SvgDiagram a -> Document
 renderDiagram font d = Document
    {_viewBox = Just (lo'x,lo'y,hi'x-lo'x,hi'y-lo'y)
-   ,_width = Nothing
-   ,_height = Nothing
+   ,_width = Just $ Px $ hi'x-lo'x
+   ,_height = Just $ Px $ hi'y-lo'y
    ,_definitions = M.fromList [("stealth",ElementMarker arrowHead)]
    ,_description = "lp-diagrams-svg generated document"
    ,_documentLocation = "no location"
