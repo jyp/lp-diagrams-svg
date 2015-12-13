@@ -13,6 +13,7 @@ data Options = Options
                  outputFile :: FilePath
                }
 
+renderMain :: SvgDiagram () -> IO ()
 renderMain diag = do
   Options{..} <- execParser (info (helper <*> pOptions) fullDesc)
   saveDiagram outputFile fontFamily diag

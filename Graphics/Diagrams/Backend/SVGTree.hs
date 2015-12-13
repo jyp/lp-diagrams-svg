@@ -4,12 +4,9 @@ module Graphics.Diagrams.Backend.SVGTree (renderDiagram, saveDiagram, SvgDiagram
 
 import Graphics.Diagrams.Core as D
 import Prelude hiding (sum,mapM_,mapM,concatMap)
-import Data.List (intercalate)
-import Numeric (showFFloat)
 import Data.Monoid
 import Graphics.Svg as S
 import Control.Monad.RWS
-import Control.Monad (when)
 import Linear.V2 (V2(..))
 import Codec.Picture.Types (PixelRGBA8(..))
 import Graphics.Text.TrueType
@@ -21,6 +18,7 @@ type SvgM = RWS Font [Path] (V2 Double,V2 Double)
 
 type SvgDiagram = Diagram String SvgM
 
+arrowHead :: Marker
 arrowHead = Marker {
   _markerDrawAttributes = mempty,
   _markerRefPoint = (Px 0,Px 0),
@@ -53,7 +51,7 @@ saveDiagram fn fontFam d = do
    Right font -> saveXmlFile fn $ renderDiagram font d
    Left err -> error err
 
--- renderDiagram :: SvgDiagram a -> Document
+renderDiagram :: Font -> SvgDiagram a -> Document
 renderDiagram font d = Document
    {_viewBox = Just (lo'x,lo'y,hi'x-lo'x,hi'y-lo'y)
    ,_width = Just $ Px $ hi'x-lo'x
@@ -67,21 +65,23 @@ renderDiagram font d = Document
         V2 lo'x lo'y = lo -- fmap floor $ lo
         V2 hi'x hi'y = hi -- fmap ceiling $ hi
 
+ptToPx :: forall a. Fractional a => a -> a
 ptToPx z = 4*z / 3
 
+renderPoint :: FrozenPoint -> V2 Double
 renderPoint (D.Point x y) = V2 (ptToPx x) (negate $ ptToPx y)
 
+renderSegment :: Segment Coord -> PathCommand
 renderSegment (StraightTo p) = LineTo OriginAbsolute [renderPoint p]
 renderSegment (D.CurveTo c d p) = S.CurveTo OriginAbsolute [(renderPoint c,renderPoint d,renderPoint p)]
 renderSegment Cycle = EndPath
 
-showDistance :: Constant -> String
-showDistance x = showFFloat (Just 4) x ""
-
+renderTip :: LineTip -> Maybe ElementRef
 renderTip t = case t of
   NoTip -> Nothing
   _ -> Just $ Ref "stealth"
 
+renderDashPattern :: [(Double, Double)] -> Maybe [Number]
 renderDashPattern [] = Nothing
 renderDashPattern xs = Just $ concat [[S.Point on, S.Point off] | (on,off) <- xs]
 
@@ -115,6 +115,8 @@ renderPathOptions PathOptions{..} = mempty
     ,_markerEnd = Last $ renderTip _endTip
     }
     -- <> toSvg _startTip <> "-" <> toSvg _endTip <> ","
+
+col :: Maybe String -> Maybe Texture
 col c = case c of
                  Nothing -> Just $ FillNone
                  Just "black" -> Just $ ColorRef $ PixelRGBA8 0 0 0 0
@@ -122,19 +124,27 @@ col c = case c of
                  Just "blue" -> Just $ ColorRef $ PixelRGBA8 0 0 255 100
                  Just c' -> Just $ TextureRef c'
 
+lbound :: V2 Double -> V2 Double -> V2 Double
 lbound (V2 x1 y1) (V2 x2 y2) = V2 (min x1 x2) (min y1 y2)
+maxPt :: V2 Double
 maxPt = V2 1000.0 1000.0
+infimum :: (V2 Double, V2 Double)
 infimum = (maxPt, negate maxPt)
+union :: (V2 Double, V2 Double) -> (V2 Double, V2 Double) -> (V2 Double, V2 Double)
 union (l1,h1) (l2,h2) = (lbound l1 l2, negate (lbound (negate h1) (negate h2)))
+dup :: t -> (t, t)
 dup x = (x,x)
 
+pathPoints :: Path' t -> [Point' t]
 pathPoints EmptyPath = []
 pathPoints (D.Path start segs) = start:concat (map segPoints segs)
 
+segPoints :: Segment t -> [Point' t]
 segPoints (D.StraightTo x) = [x]
 segPoints (D.CurveTo c d p) = [c,d,p]
 segPoints Cycle = []
 
+mkPairs :: forall t. [t] -> [(t, t)]
 mkPairs (x:y:xs) = (x,y):mkPairs xs
 mkPairs _ = []
 
@@ -172,4 +182,6 @@ svgBackend = Backend {..} where
     return (BoxSpec {..})
 
 
+-- DrawAttributes for text rendering
+textAttrs :: DrawAttributes
 textAttrs = mempty {S._fillColor = Last $ col $ Just "black"}
