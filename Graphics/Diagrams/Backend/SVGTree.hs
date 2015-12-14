@@ -4,7 +4,6 @@ module Graphics.Diagrams.Backend.SVGTree (renderDiagram, saveDiagram, SvgDiagram
 
 import Graphics.Diagrams.Core as D
 import Prelude hiding (sum,mapM_,mapM,concatMap)
-import Data.Monoid
 import Graphics.Svg as S
 import Control.Monad.RWS
 import Linear.V2 (V2(..))

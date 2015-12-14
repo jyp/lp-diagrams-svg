@@ -1,11 +1,12 @@
-
 import Graphics.Diagrams.SVG
 
-autoLab s i = do
-  o <- labelObj s
-  -- stroke "red" $ path $ polyline [o # BaseW, o # BaseE]
-  -- stroke "blue" $ path $ polygon [o # NW, o # NE, o # SE, o # SW]
-  autoLabel o i
+-- autoLab s i = do
+--   o <- labelObj s
+--   -- stroke "red" $ path $ polyline [o # BaseW, o # BaseE]
+--   -- stroke "blue" $ path $ polygon [o # NW, o # NE, o # SE, o # SW]
+--   autoLabelObj o i
+
+autoLab = autoLabel
 
 testDiagram :: SvgDiagram ()
 testDiagram = do
