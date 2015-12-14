@@ -62,7 +62,7 @@ renderDiagram font d = Document
    ,_elements = map PathTree paths}
   where (_,(lo,hi),paths) = runRWS (runDiagram svgBackend d) font infimum
         V2 lo'x lo'y = lo - border
-        V2 hi'x hi'y = hi - border
+        V2 hi'x hi'y = hi + border
         border = V2 5 5
 
 ptToPx :: forall a. Fractional a => a -> a
