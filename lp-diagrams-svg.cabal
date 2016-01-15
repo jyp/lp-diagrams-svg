@@ -17,7 +17,7 @@ Flag example
 
 library
   build-depends: lp-diagrams
-  build-depends: base
+  build-depends: base < 666
                , lucid-svg
                , text
                , containers
@@ -44,7 +44,7 @@ executable lp-diagrams-svg-example
   main-is: Main.hs
   build-depends: lp-diagrams-svg
   build-depends: lp-diagrams
-  build-depends: base
+  build-depends: base < 666
                , containers
                , lens
                , FontyFruity
