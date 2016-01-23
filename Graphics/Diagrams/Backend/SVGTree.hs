@@ -3,14 +3,24 @@
 module Graphics.Diagrams.Backend.SVGTree (renderDiagram, saveDiagram, SvgDiagram) where
 
 import Graphics.Diagrams.Core as D
-import Prelude hiding (sum,mapM_,mapM,concatMap)
-import Graphics.Svg as S
+import Prelude hiding (sum,mapM_,mapM,concatMap,Num(..),(/))
+import qualified Prelude
+import Graphics.Svg as S hiding (Group)
 import Control.Monad.RWS
 import Linear.V2 (V2(..))
 import Codec.Picture.Types (PixelRGBA8(..))
 import Graphics.Text.TrueType
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Map as M
+import Algebra.Classes
+
+instance Additive a => Additive (V2 a) where
+  a + b = (+) <$> a <*> b
+  zero = pure zero
+
+instance Group a => Group (V2 a) where
+  a - b = (-) <$> a <*> b
+  negate = fmap negate
 
 -- TODO -- add a newtype so this does not leak to the user code.
 type SvgM = RWS Font [Path] (V2 Double,V2 Double)
@@ -65,8 +75,8 @@ renderDiagram font d = Document
         V2 hi'x hi'y = hi + border
         border = V2 5 5
 
-ptToPx :: forall a. Fractional a => a -> a
-ptToPx z = 4*z / 3
+ptToPx :: forall a. Field a => a -> a
+ptToPx z = fromInteger 4*z / fromInteger 3
 
 renderPoint :: FrozenPoint -> V2 Double
 renderPoint (D.Point x y) = V2 (ptToPx x) (negate $ ptToPx y)
