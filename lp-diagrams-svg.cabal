@@ -2,7 +2,7 @@ name:           lp-diagrams-svg
 version:        1.1
 category:       Graphics
 synopsis:       SVG Backend for lp-diagrams
-license:        GPL3
+license:        GPL
 license-file:   LICENSE
 author:         Jean-Philippe Bernardy
 maintainer:     jeanphilippe.bernardy@gmail.com
@@ -49,6 +49,7 @@ executable lp-diagrams-svg-example
                , containers
                , lens
                , FontyFruity
+               , gasp
                -- , svg-tree
                -- , mtl
                -- , linear

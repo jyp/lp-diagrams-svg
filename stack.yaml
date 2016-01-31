@@ -10,7 +10,7 @@ packages:
 - '../svg-tree'
 - '../lp-diagrams'
 - '../FontyFruity'
-- '../glpk      '
+- '../glpk'
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
@@ -20,7 +20,10 @@ extra-deps:
 - labeled-tree-1.0.0.0
 
 # Override default flag values for local packages and extra-deps
-flags: {}
+flags:
+  lp-diagrams-svg:
+    example: true
+
 
 # Extra package databases containing global packages
 extra-package-dbs: []
