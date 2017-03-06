@@ -6,6 +6,7 @@ import System.Environment
 import Graphics.Text.TrueType
 import Options.Applicative
 import Graphics.Diagrams.Backend.SVGTree
+import Data.Monoid
 
 data Options = Options
                {
