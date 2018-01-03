@@ -37,6 +37,7 @@ arrowHead = Marker {
   _markerUnits = Nothing,
   _markerViewBox = Nothing,
   _markerOverflow = Just OverflowVisible,
+  _markerAspectRatio = defaultSvg,
   _markerElements =
     [PathTree $ S.Path
      mempty {_transform = Just [Scale 0.8 Nothing, Rotate 180 Nothing, Translate 12.5 0]
