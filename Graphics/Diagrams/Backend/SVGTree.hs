@@ -108,13 +108,13 @@ renderPathOptions PathOptions{..} = mempty
                           RoundCap -> CapRound
                           RectCap -> CapSquare
                           ButtCap -> CapButt
-    -- _strokeOpacity,
+   ,_strokeOpacity = opacity $ col _drawColor
    ,_strokeLineJoin = case _lineJoin of
                        RoundJoin -> Last $ Just $ JoinRound
                        BevelJoin -> Last $ Just $ JoinBevel
                        MiterJoin -> Last $ Just $ JoinMiter
     -- _strokeMiterLimit,
-    -- _fillOpacity,
+   ,_fillOpacity = opacity $ col _fillColor
     -- _groupOpacity,
     -- _transform, _fillRule,
     -- _maskRef, _clipPathRef,
@@ -133,9 +133,9 @@ renderPathOptions PathOptions{..} = mempty
 col :: Maybe String -> Maybe Texture
 col c = Just $ case c of
                  Nothing -> FillNone
-                 Just "black" -> ColorRef $ PixelRGBA8 0 0 0 0
-                 Just "red" -> ColorRef $ PixelRGBA8 255 0 0 100
-                 Just "blue" -> ColorRef $ PixelRGBA8 0 0 255 100
+                 Just "black" -> ColorRef $ PixelRGBA8 0 0 0 255
+                 Just "red" -> ColorRef $ PixelRGBA8 255 0 0 255
+                 Just "blue" -> ColorRef $ PixelRGBA8 0 0 255 255
                  Just c' -> parseCol c'
 
 parseCol :: String -> Texture
@@ -145,6 +145,11 @@ parseCol str
             values = chunksOf 2 . take 8 . (++ "ff") . tail
         in ColorRef $ PixelRGBA8 r g b a
     | otherwise = TextureRef str
+
+opacity :: Maybe Texture -> Maybe Float
+opacity t = case t of
+    Just (ColorRef (PixelRGBA8 r g b a)) -> Just $ fromIntegral a / 255
+    _ -> Nothing
 
 lbound :: V2 Double -> V2 Double -> V2 Double
 lbound (V2 x1 y1) (V2 x2 y2) = V2 (min x1 x2) (min y1 y2)
