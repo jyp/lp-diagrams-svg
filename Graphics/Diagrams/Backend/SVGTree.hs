@@ -10,6 +10,9 @@ import Control.Monad.RWS
 import Linear.V2 (V2(..))
 import Codec.Picture.Types (PixelRGBA8(..))
 import Graphics.Text.TrueType
+import Numeric (readHex)
+import Text.Regex.Posix ((=~))
+import Data.List.Split (chunksOf)
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Map as M
 import Algebra.Classes
@@ -128,12 +131,20 @@ renderPathOptions PathOptions{..} = mempty
     -- <> toSvg _startTip <> "-" <> toSvg _endTip <> ","
 
 col :: Maybe String -> Maybe Texture
-col c = case c of
-                 Nothing -> Just $ FillNone
-                 Just "black" -> Just $ ColorRef $ PixelRGBA8 0 0 0 0
-                 Just "red" -> Just $ ColorRef $ PixelRGBA8 255 0 0 100
-                 Just "blue" -> Just $ ColorRef $ PixelRGBA8 0 0 255 100
-                 Just c' -> Just $ TextureRef c'
+col c = Just $ case c of
+                 Nothing -> FillNone
+                 Just "black" -> ColorRef $ PixelRGBA8 0 0 0 0
+                 Just "red" -> ColorRef $ PixelRGBA8 255 0 0 100
+                 Just "blue" -> ColorRef $ PixelRGBA8 0 0 255 100
+                 Just c' -> parseCol c'
+
+parseCol :: String -> Texture
+parseCol str
+    | str =~ ("^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$" :: String) =
+        let [r, g, b, a] = (fst . head . readHex) <$> values str
+            values = chunksOf 2 . take 8 . (++ "ff") . tail
+        in ColorRef $ PixelRGBA8 r g b a
+    | otherwise = TextureRef str
 
 lbound :: V2 Double -> V2 Double -> V2 Double
 lbound (V2 x1 y1) (V2 x2 y2) = V2 (min x1 x2) (min y1 y2)
