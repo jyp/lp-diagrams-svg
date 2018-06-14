@@ -25,6 +25,8 @@ library
                , svg-tree
                , mtl
                , linear
+               , regex-posix
+               , split
                , JuicyPixels
                , FontyFruity
                , vector
